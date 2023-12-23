@@ -1,0 +1,44 @@
+.chat-container {
+  width: 320px;
+  height: 500px;
+  background-color: rgb(0, 191, 255);
+  padding: 10px 10px 0;
+}
+
+.chat-container .list {
+  margin-top: 4px;
+}
+
+.list > .content {
+  display: inline-block;
+}
+
+.chat-container .my-chat {
+  text-align: right;
+}
+.my-chat .content {
+  background-color: rgb(171, 171, 69);
+}
+.chat-container .other-chat {
+  text-align: left;
+}
+.other-chat .content {
+  background-color: white;
+}
+
+.chat-container .notice {
+  font-size: 12px;
+  color: aqua;
+  text-align: center;
+  margin-top: 40px;
+}
+
+.input-container {
+  width: 320px;
+  display: flex;
+  justify-content: space-between;
+}
+
+.input-container > input {
+  flex-grow: 1;
+}
