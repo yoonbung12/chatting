@@ -7,6 +7,7 @@ const PORT = 8000;
 
 // cors 이슈 : 다른 서버에서 보내는 요청을 제한함
 const cors = require("cors");
+const { access } = require("fs");
 app.use(cors());
 
 const io = require("socket.io")(server, {
@@ -16,7 +17,24 @@ const io = require("socket.io")(server, {
 });
 
 const userIdArr = {};
-// { "socket.id": "userIda", "socket.id": "userIdb" ,"socket.id": "userIdc"  }
+const userRoomIdArr = {};
+
+const updateAllRoom = (roomId) => {
+  // userRoomIdArr에서 roomId와 일치하는 socket.id찾기
+  const socketIdInRoom = Object.values(userRoomIdArr).filter(
+    (socketId) => userRoomIdArr[socketId] === roomId
+  );
+
+  // userRoomIdArr에서 socketIdInRoom 배열과 잎치하는 socket.id : userId저장
+  const userInRoom = socketIdInRoom.reduce((acc, socketId) => {
+    acc[socketId] = userIdArr[socketId];
+    return acc;
+  }, {});
+
+  if (roomId === "FRONTEND") io.emit("updateFrontList", userInRoom);
+  else if (roomId === "BACKEND") io.emit("updateBackList", userInRoom);
+  else io.emit("updateFullList", userInRoom);
+};
 
 const updateUserList = () => {
   io.emit("userList", userIdArr);
@@ -32,21 +50,38 @@ io.on("connection", (socket) => {
         msg: "중복된 아이디가 존재하여 입장이 불가합니다.",
       });
     } else {
-      //중복되지 않을 경우에
-      io.emit("notice", { msg: `${res.userId}님이 입장하셨습니다.` });
+      // 중복되지 않을 경우에
+      // 해당하는 단체방에 입장
+      socket.join(res.roomId);
+      userRoomIdArr[socket.id] = res.roomId;
+      // 특정 방에 속한 모든 클라이언트에게 전달
+      io.to(res.roomId).emit("notice", {
+        msg: `${res.userId}님이 입장하셨습니다.`,
+      });
       socket.emit("entrySuccess", { userId: res.userId });
       userIdArr[socket.id] = res.userId;
       updateUserList();
+      updateAllRoom(res.roomId);
     }
     console.log(userIdArr);
+    console.log(userRoomIdArr);
     // 중복된다는 오류 메세지를 보내주던지
   });
 
   socket.on("disconnect", () => {
-    io.emit("notice", { msg: `${userIdArr[socket.id]}님이 퇴장하셨습니다.` });
-    delete userIdArr[socket.id];
+    let deleteAllRoom;
+    if (userIdArr[socket.id]) {
+      io.to(userRoomIdArr[socket.id]).emit("notice", {
+        msg: `${userIdArr[socket.id]}님이 퇴장하셨습니다.`,
+      });
+      socket.leave(userRoomIdArr[socket.id]);
+      deleteAllRoom = userRoomIdArr[socket.id];
+      delete userRoomIdArr[socket.id];
+      delete userIdArr[socket.id];
+    }
     console.log(userIdArr);
     updateUserList();
+    updateAllRoom(deleteAllRoom);
   });
 
   // 실습 4번
@@ -62,13 +97,6 @@ io.on("connection", (socket) => {
       });
       socket.emit("chat", { userId: res.userId, msg: res.msg, dm: true });
     }
-  });
-
-  // 실습 5번 (소켓룸 만들어 보기)
-  // 룸의 목록 요청:  네임스페이스의 룸 목록 반환
-  socket.on("getRooms", (res) => {
-    // 다른 유저들도 접근할 수 있다.
-    socket.emit("rooms", io.socket.adapter.rooms);
   });
 });
 
